@@ -386,12 +386,21 @@ function StatusBar({ frame, live, status }) {
     </span>
   );
 
+  // "live" only means our socket is delivering frames. The exchange feed can be
+  // dead while frames keep arriving, so freshness is judged on tick age.
+  const age = frame?.feedAgeSec;
+  const dataFresh = age !== null && age !== undefined && age < 10;
   const chips = [];
-  chips.push(
-    live
-      ? chip("LIVE", C.abyss, C.verdigris, "l")
-      : chip(status === "stale" ? "FEED STALLED" : "FEED OFFLINE", "#fff", C.oxide, "l")
-  );
+
+  if (!live) {
+    chips.push(chip(status === "stale" ? "FEED STALLED" : "FEED OFFLINE", "#fff", C.oxide, "l"));
+  } else if (frame?.marketHours && !dataFresh) {
+    chips.push(chip("EXCHANGE DATA STALE", "#fff", C.oxide, "l"));
+  } else if (!frame?.marketHours) {
+    chips.push(chip("MARKET CLOSED", C.champagne, C.slate, "l"));
+  } else {
+    chips.push(chip("LIVE", C.abyss, C.verdigris, "l"));
+  }
   if (frame?.segmentStatus && frame.segmentStatus !== "UNKNOWN") {
     chips.push(chip(frame.segmentStatus.replace("_", " "), C.champagne, C.slate, "s"));
   }
@@ -505,6 +514,24 @@ export default function CASOrderFlow() {
         </div>
       </div>
 
+      {live && frame.marketHours && !(frame.feedAgeSec < 10) && (
+        <div
+          style={{
+            background: "#2A100C",
+            border: `1px solid ${C.oxide}`,
+            padding: "10px 14px",
+            marginBottom: 14,
+            borderRadius: 3,
+            fontSize: 12.5,
+            color: "#F0BDB5",
+          }}
+        >
+          The exchange feed has gone quiet
+          {frame.feedAgeSec ? ` for ${Math.round(frame.feedAgeSec)}s` : ""}. Prices below
+          are frozen at their last received values and are not current.
+        </div>
+      )}
+
       {!live && (
         <div
           style={{
@@ -582,6 +609,13 @@ export default function CASOrderFlow() {
 
           <div>
             <Eyebrow>Cash order tilt</Eyebrow>
+            {!frame.anchored ? (
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>
+                Meaningful only during the auction. Outside it, the book carries
+                leftovers from the previous session.
+              </div>
+            ) : (
+            <>
             <div style={{ display: "flex", height: 24, marginTop: 7, gap: 2 }}>
               <div
                 style={{
@@ -630,6 +664,8 @@ export default function CASOrderFlow() {
               <span>buy {qty(totals.b)}</span>
               <span>sell {qty(totals.s)}</span>
             </div>
+            </>
+            )}
           </div>
         </Panel>
       </div>
@@ -645,7 +681,9 @@ export default function CASOrderFlow() {
             marginBottom: 10,
           }}
         >
-          <Eyebrow>Where the close is coming from</Eyebrow>
+          <Eyebrow>
+            {frame.anchored ? "Where the close is coming from" : "Last traded, awaiting the auction"}
+          </Eyebrow>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {[
               ["points", "Index impact"],
@@ -674,14 +712,14 @@ export default function CASOrderFlow() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ overflowX: "auto", opacity: frame.anchored ? 1 : 0.55 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
             <thead>
               <tr>
                 {[
                   ["Stock", "left"],
-                  ["3:15 ref", "right"],
-                  ["Indicative", "right"],
+                  [frame.anchored ? "3:15 ref" : "Prev close", "right"],
+                  [frame.anchored ? "Indicative" : "Last price", "right"],
                   ["Move", "right"],
                   ["Buy less sell", "right"],
                   ["Index pts", "right"],
