@@ -14,18 +14,28 @@ import useLiveFeed from "./useLiveFeed.js";
 
 /* ---------------------------------------------------------------- tokens --- */
 
+// Light theme, built from the brand gradient: deep violet -> vivid violet -> magenta.
+// Green/red stay reserved for actual gains and losses so the numbers that matter
+// are never ambiguous with the brand color.
 const C = {
-  abyss: "#080F1C",
-  hull: "#0E1728",
-  slate: "#16233A",
-  rule: "#22334F",
-  champagne: "#E4D9B4",
-  champagneDim: "#8C876F",
-  verdigris: "#3FA89B",
-  oxide: "#BF4436",
-  muted: "#5A6B82",
-  paper: "#C9D4E4",
+  page: "#F8F5FC",
+  hull: "#FFFFFF",
+  slate: "#F1E9FB",
+  rule: "#E2D6F5",
+  abyss: "#1E1333",
+  champagne: "#5B21B6",
+  champagneDim: "#8B7CAC",
+  verdigris: "#0CA30C",
+  oxide: "#D03B3B",
+  muted: "#7C6D96",
+  paper: "#241A3D",
+  brandDeep: "#5B21B6",
+  brandMid: "#9D1DFF",
+  brandBright: "#E619C4",
+  onAccent: "#FFFFFF",
 };
+
+const BRAND_GRADIENT = `linear-gradient(90deg, ${C.brandDeep}, ${C.brandMid}, ${C.brandBright})`;
 
 const DISPLAY = "'Archivo', ui-sans-serif, system-ui, sans-serif";
 const MONO = "'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace";
@@ -37,7 +47,7 @@ const T = (h, m) => h * 3600 + m * 60;
 const PHASES = [
   { id: "REFERENCE", from: T(15, 15), to: T(15, 20), label: "Reference price", tone: C.muted },
   { id: "ENTRY_ALL", from: T(15, 20), to: T(15, 25), label: "Market + limit", tone: C.champagne },
-  { id: "ENTRY_LIMIT_ONLY", from: T(15, 25), to: T(15, 30), label: "Limit only", tone: C.oxide },
+  { id: "ENTRY_LIMIT_ONLY", from: T(15, 25), to: T(15, 30), label: "Limit only", tone: C.brandBright },
   { id: "MATCHING", from: T(15, 30), to: T(15, 35), label: "Matching", tone: C.verdigris },
 ];
 
@@ -75,7 +85,7 @@ function Eyebrow({ children, color = C.champagneDim }) {
     <div
       style={{
         fontFamily: DISPLAY,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 600,
         letterSpacing: "0.16em",
         textTransform: "uppercase",
@@ -90,10 +100,12 @@ function Eyebrow({ children, color = C.champagneDim }) {
 function Panel({ children, style }) {
   return (
     <div
+      className="cas-panel"
       style={{
         background: C.hull,
         border: `1px solid ${C.rule}`,
-        borderRadius: 3,
+        borderRadius: 10,
+        boxShadow: "0 1px 2px rgba(30, 19, 51, 0.04)",
         ...style,
       }}
     >
@@ -117,15 +129,15 @@ function Hero({ frame }) {
         <div
           style={{
             fontFamily: MONO,
-            fontSize: 52,
+            fontSize: "clamp(40px, 10vw, 60px)",
             fontWeight: 600,
             color: C.champagne,
-            marginTop: 6,
+            marginTop: 8,
           }}
         >
           {frame.nifty ? nf(frame.nifty) : "----"}
         </div>
-        <div style={{ color: C.muted, fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: C.muted, fontSize: 15, marginTop: 10 }}>
           {!frame.marketHours
             ? "Market closed. The closing number appears during the auction, 3:15 to 3:35."
             : toStart > 0
@@ -139,7 +151,7 @@ function Hero({ frame }) {
   const up = c.changePoints >= 0;
 
   return (
-    <Panel style={{ padding: "26px 24px 22px" }}>
+    <Panel style={{ padding: "28px 26px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <Eyebrow>Nifty 50 will close at</Eyebrow>
         <Eyebrow color={lockIn > 0 ? C.champagneDim : C.oxide}>
@@ -148,14 +160,15 @@ function Hero({ frame }) {
       </div>
 
       <div
+        className="cas-hero-figure"
         style={{
           fontFamily: MONO,
-          fontSize: "clamp(44px, 9vw, 76px)",
-          fontWeight: 600,
-          color: C.champagne,
+          fontSize: "clamp(52px, 11vw, 92px)",
+          fontWeight: 700,
+          backgroundImage: BRAND_GRADIENT,
           lineHeight: 1.02,
           letterSpacing: "-0.02em",
-          marginTop: 8,
+          marginTop: 10,
           fontVariantNumeric: "tabular-nums",
         }}
       >
@@ -166,20 +179,20 @@ function Hero({ frame }) {
         style={{
           display: "flex",
           alignItems: "baseline",
-          gap: 14,
+          gap: 16,
           flexWrap: "wrap",
-          marginTop: 8,
+          marginTop: 10,
         }}
       >
-        <div style={{ fontFamily: MONO, fontSize: 20, color: tone(c.changePoints) }}>
+        <div style={{ fontFamily: MONO, fontSize: 23, fontWeight: 600, color: tone(c.changePoints) }}>
           {up ? "+" : ""}
           {nf(c.changePoints)} ({up ? "+" : ""}
           {c.changePct}%)
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 15, color: C.paper }}>
+        <div style={{ fontFamily: MONO, fontSize: 17, color: C.paper }}>
           &plusmn; {c.bandPoints} pts
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 13, color: C.muted }}>
+        <div style={{ fontFamily: MONO, fontSize: 15, color: C.muted }}>
           {nf(c.low)} to {nf(c.high)}
         </div>
       </div>
@@ -227,7 +240,7 @@ function Hero({ frame }) {
             display: "flex",
             justifyContent: "space-between",
             fontFamily: MONO,
-            fontSize: 10,
+            fontSize: 11.5,
             color: C.muted,
           }}
         >
@@ -236,7 +249,7 @@ function Hero({ frame }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.55 }}>
         Anchored to the 3:15 print of {nf(c.anchor)}. Band {c.bandBasis}. Covering{" "}
         {c.coverage}% of index weight. The figure is exact if the order book stops
         changing, and orders can still arrive until the book locks.
@@ -300,10 +313,10 @@ function Rail({ frame }) {
               x={x(p.from) + 7}
               y={railY + 14}
               fontFamily={DISPLAY}
-              fontSize="10"
+              fontSize="11"
               fontWeight="600"
               letterSpacing="0.07em"
-              fill={on ? C.abyss : C.muted}
+              fill={on ? C.onAccent : C.muted}
             >
               {p.label.toUpperCase()}
             </text>
@@ -322,7 +335,7 @@ function Rail({ frame }) {
         x={x(T(15, 28))}
         y={railY + railH + 12}
         fontFamily={DISPLAY}
-        fontSize="9"
+        fontSize="10"
         fontWeight="600"
         letterSpacing="0.1em"
         fill={C.oxide}
@@ -345,7 +358,7 @@ function Rail({ frame }) {
             y={y(ext.anchor) - 5}
             textAnchor="end"
             fontFamily={MONO}
-            fontSize="9.5"
+            fontSize="10.5"
             fill={C.champagneDim}
           >
             3:15 print {nf(ext.anchor)}
@@ -372,11 +385,11 @@ function StatusBar({ frame, live, status }) {
       key={key}
       style={{
         fontFamily: DISPLAY,
-        fontSize: 9.5,
+        fontSize: 11,
         fontWeight: 700,
-        letterSpacing: "0.13em",
-        padding: "3px 8px",
-        borderRadius: 2,
+        letterSpacing: "0.12em",
+        padding: "4px 10px",
+        borderRadius: 4,
         background: bg,
         color,
         whiteSpace: "nowrap",
@@ -393,13 +406,13 @@ function StatusBar({ frame, live, status }) {
   const chips = [];
 
   if (!live) {
-    chips.push(chip(status === "stale" ? "FEED STALLED" : "FEED OFFLINE", "#fff", C.oxide, "l"));
+    chips.push(chip(status === "stale" ? "FEED STALLED" : "FEED OFFLINE", C.onAccent, C.oxide, "l"));
   } else if (frame?.marketHours && !dataFresh) {
-    chips.push(chip("EXCHANGE DATA STALE", "#fff", C.oxide, "l"));
+    chips.push(chip("EXCHANGE DATA STALE", C.onAccent, C.oxide, "l"));
   } else if (!frame?.marketHours) {
     chips.push(chip("MARKET CLOSED", C.champagne, C.slate, "l"));
   } else {
-    chips.push(chip("LIVE", C.abyss, C.verdigris, "l"));
+    chips.push(chip("LIVE", C.onAccent, C.verdigris, "l"));
   }
   if (frame?.segmentStatus && frame.segmentStatus !== "UNKNOWN") {
     chips.push(chip(frame.segmentStatus.replace("_", " "), C.champagne, C.slate, "s"));
@@ -408,7 +421,7 @@ function StatusBar({ frame, live, status }) {
     chips.push(
       chip(
         `IEP ${frame.iep.confirmed ? "CONFIRMED" : "UNCONFIRMED"} ${frame.iep.movingWithFrozenVolume}/${frame.iep.sampled}`,
-        frame.iep.confirmed ? C.abyss : "#fff",
+        C.onAccent,
         frame.iep.confirmed ? C.verdigris : C.oxide,
         "i"
       )
@@ -450,18 +463,18 @@ export default function CASOrderFlow() {
   }, [stocks]);
 
   const wrap = {
-    background: C.abyss,
+    background: C.page,
     color: C.paper,
     fontFamily: DISPLAY,
     minHeight: "100vh",
-    padding: "18px 18px 30px",
+    padding: "clamp(14px, 3vw, 28px) clamp(14px, 4vw, 32px) 36px",
   };
 
   if (!frame) {
     return (
       <div style={wrap}>
         <Eyebrow>The Chartians</Eyebrow>
-        <div style={{ marginTop: 20, color: C.muted, fontSize: 14 }}>
+        <div style={{ marginTop: 20, color: C.muted, fontSize: 16 }}>
           {live ? "Waiting for the first frame." : "Connecting to the live feed."}
         </div>
       </div>
@@ -472,38 +485,46 @@ export default function CASOrderFlow() {
     <div style={wrap}>
       <div
         style={{
+          height: 4,
+          borderRadius: 4,
+          marginBottom: 16,
+          backgroundImage: BRAND_GRADIENT,
+        }}
+      />
+      <div
+        style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-end",
           flexWrap: "wrap",
-          gap: 12,
+          gap: 14,
           borderBottom: `1px solid ${C.rule}`,
-          paddingBottom: 12,
-          marginBottom: 14,
+          paddingBottom: 14,
+          marginBottom: 16,
         }}
       >
         <div>
           <Eyebrow>The Chartians</Eyebrow>
           <div
             style={{
-              fontSize: 24,
+              fontSize: "clamp(22px, 4vw, 30px)",
               fontWeight: 700,
               letterSpacing: "-0.02em",
               color: C.champagne,
-              marginTop: 3,
+              marginTop: 4,
             }}
           >
             Closing Auction, live
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 18, flexWrap: "wrap" }}>
           <StatusBar frame={frame} live={live} status={status} />
           <div style={{ textAlign: "right" }}>
             <Eyebrow>IST</Eyebrow>
             <div
               style={{
                 fontFamily: MONO,
-                fontSize: 24,
+                fontSize: "clamp(20px, 3.5vw, 27px)",
                 color: C.champagne,
                 fontVariantNumeric: "tabular-nums",
               }}
@@ -517,13 +538,13 @@ export default function CASOrderFlow() {
       {live && frame.marketHours && !(frame.feedAgeSec < 10) && (
         <div
           style={{
-            background: "#2A100C",
+            background: "#FDECEC",
             border: `1px solid ${C.oxide}`,
-            padding: "10px 14px",
-            marginBottom: 14,
-            borderRadius: 3,
-            fontSize: 12.5,
-            color: "#F0BDB5",
+            padding: "12px 16px",
+            marginBottom: 16,
+            borderRadius: 8,
+            fontSize: 14,
+            color: "#8A2424",
           }}
         >
           The exchange feed has gone quiet
@@ -535,13 +556,13 @@ export default function CASOrderFlow() {
       {!live && (
         <div
           style={{
-            background: "#2A100C",
+            background: "#FDECEC",
             border: `1px solid ${C.oxide}`,
-            padding: "10px 14px",
-            marginBottom: 14,
-            borderRadius: 3,
-            fontSize: 12.5,
-            color: "#F0BDB5",
+            padding: "12px 16px",
+            marginBottom: 16,
+            borderRadius: 8,
+            fontSize: 14,
+            color: "#8A2424",
           }}
         >
           The feed has stopped. These numbers are the last received and are no longer
@@ -549,16 +570,14 @@ export default function CASOrderFlow() {
         </div>
       )}
 
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 16 }}>
         <Hero frame={frame} />
       </div>
 
       <div
+        className="cas-two-col"
         style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(300px, 2.2fr) minmax(230px, 1fr)",
-          gap: 14,
-          marginBottom: 14,
+          marginBottom: 16,
         }}
       >
         <Panel style={{ padding: "12px 12px 4px" }}>
@@ -571,14 +590,15 @@ export default function CASOrderFlow() {
             <Eyebrow>Futures, trading until 3:40</Eyebrow>
             {frame.futures ? (
               <>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 5 }}>
-                  <div style={{ fontFamily: MONO, fontSize: 22, color: C.paper }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 6 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 25, color: C.paper }}>
                     {nf(frame.futures.futures)}
                   </div>
                   <div
                     style={{
                       fontFamily: MONO,
-                      fontSize: 13,
+                      fontSize: 15,
+                      fontWeight: 600,
                       color: tone(frame.futures.gapPoints),
                     }}
                   >
@@ -588,10 +608,10 @@ export default function CASOrderFlow() {
                 </div>
                 <div
                   style={{
-                    fontSize: 11.5,
+                    fontSize: 13,
                     color: frame.futures.significant ? C.champagne : C.muted,
-                    marginTop: 5,
-                    lineHeight: 1.45,
+                    marginTop: 6,
+                    lineHeight: 1.5,
                   }}
                 >
                   {frame.futures.read}
@@ -599,7 +619,7 @@ export default function CASOrderFlow() {
                 </div>
               </>
             ) : (
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 6 }}>
                 Available once the auction anchors.
               </div>
             )}
@@ -610,23 +630,23 @@ export default function CASOrderFlow() {
           <div>
             <Eyebrow>Cash order tilt</Eyebrow>
             {!frame.anchored ? (
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>
+              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
                 Meaningful only during the auction. Outside it, the book carries
                 leftovers from the previous session.
               </div>
             ) : (
             <>
-            <div style={{ display: "flex", height: 24, marginTop: 7, gap: 2 }}>
+            <div style={{ display: "flex", height: 28, marginTop: 8, gap: 2, borderRadius: 6, overflow: "hidden" }}>
               <div
                 style={{
                   width: `${totals.tilt}%`,
-                  background: C.verdigris,
+                  backgroundImage: `linear-gradient(90deg, ${C.brandDeep}, ${C.brandMid})`,
                   display: "flex",
                   alignItems: "center",
-                  paddingLeft: 7,
+                  paddingLeft: 9,
                   fontFamily: MONO,
-                  fontSize: 11,
-                  color: C.abyss,
+                  fontSize: 12.5,
+                  color: C.onAccent,
                   fontWeight: 600,
                   transition: "width 400ms ease",
                 }}
@@ -636,14 +656,14 @@ export default function CASOrderFlow() {
               <div
                 style={{
                   width: `${100 - totals.tilt}%`,
-                  background: C.oxide,
+                  background: C.brandBright,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "flex-end",
-                  paddingRight: 7,
+                  paddingRight: 9,
                   fontFamily: MONO,
-                  fontSize: 11,
-                  color: C.abyss,
+                  fontSize: 12.5,
+                  color: C.onAccent,
                   fontWeight: 600,
                   transition: "width 400ms ease",
                 }}
@@ -656,9 +676,9 @@ export default function CASOrderFlow() {
                 display: "flex",
                 justifyContent: "space-between",
                 fontFamily: MONO,
-                fontSize: 10.5,
+                fontSize: 12,
                 color: C.muted,
-                marginTop: 5,
+                marginTop: 6,
               }}
             >
               <span>buy {qty(totals.b)}</span>
@@ -670,21 +690,21 @@ export default function CASOrderFlow() {
         </Panel>
       </div>
 
-      <Panel style={{ padding: "14px 16px 8px" }}>
+      <Panel style={{ padding: "16px 18px 10px" }}>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: 10,
-            marginBottom: 10,
+            gap: 12,
+            marginBottom: 12,
           }}
         >
           <Eyebrow>
             {frame.anchored ? "Where the close is coming from" : "Last traded, awaiting the auction"}
           </Eyebrow>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
             {[
               ["points", "Index impact"],
               ["imbalance", "Imbalance"],
@@ -693,17 +713,18 @@ export default function CASOrderFlow() {
             ].map(([k, l]) => (
               <button
                 key={k}
+                className="cas-sort-btn"
                 onClick={() => setSortKey(k)}
                 style={{
                   fontFamily: DISPLAY,
-                  fontSize: 10.5,
+                  fontSize: 12,
                   fontWeight: 600,
-                  padding: "4px 9px",
-                  borderRadius: 2,
+                  padding: "6px 12px",
+                  borderRadius: 6,
                   cursor: "pointer",
-                  background: sortKey === k ? C.champagne : "transparent",
-                  color: sortKey === k ? C.abyss : C.muted,
-                  border: `1px solid ${sortKey === k ? C.champagne : C.rule}`,
+                  background: sortKey === k ? BRAND_GRADIENT : "transparent",
+                  color: sortKey === k ? C.onAccent : C.muted,
+                  border: `1px solid ${sortKey === k ? "transparent" : C.rule}`,
                 }}
               >
                 {l}
@@ -712,7 +733,7 @@ export default function CASOrderFlow() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto", opacity: frame.anchored ? 1 : 0.55 }}>
+        <div className="cas-table-scroll" style={{ overflowX: "auto", opacity: frame.anchored ? 1 : 0.55 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
             <thead>
               <tr>
@@ -728,12 +749,12 @@ export default function CASOrderFlow() {
                     key={h}
                     style={{
                       textAlign: a,
-                      fontSize: 9.5,
+                      fontSize: 11,
                       fontWeight: 600,
-                      letterSpacing: "0.12em",
+                      letterSpacing: "0.1em",
                       textTransform: "uppercase",
                       color: C.champagneDim,
-                      padding: "0 8px 7px",
+                      padding: "0 10px 9px",
                       borderBottom: `1px solid ${C.rule}`,
                       whiteSpace: "nowrap",
                     }}
@@ -745,26 +766,26 @@ export default function CASOrderFlow() {
             </thead>
             <tbody>
               {sorted.map((s) => (
-                <tr key={s.sym} style={{ borderBottom: `1px solid ${C.abyss}` }}>
+                <tr key={s.sym} className="cas-row" style={{ borderBottom: `1px solid ${C.rule}` }}>
                   <td
                     style={{
-                      padding: "6px 8px",
+                      padding: "9px 10px",
                       fontFamily: MONO,
-                      fontSize: 11.5,
+                      fontSize: 13.5,
                       whiteSpace: "nowrap",
                     }}
                   >
                     {s.sym}
-                    <span style={{ color: C.muted, fontSize: 9.5, marginLeft: 5 }}>
+                    <span style={{ color: C.muted, fontSize: 11, marginLeft: 6 }}>
                       {s.weight}%
                     </span>
                   </td>
                   <td
                     style={{
-                      padding: "6px 8px",
+                      padding: "9px 10px",
                       textAlign: "right",
                       fontFamily: MONO,
-                      fontSize: 11.5,
+                      fontSize: 13.5,
                       color: C.muted,
                     }}
                   >
@@ -772,10 +793,11 @@ export default function CASOrderFlow() {
                   </td>
                   <td
                     style={{
-                      padding: "6px 8px",
+                      padding: "9px 10px",
                       textAlign: "right",
                       fontFamily: MONO,
-                      fontSize: 11.5,
+                      fontSize: 13.5,
+                      fontWeight: 600,
                       color: C.champagne,
                     }}
                   >
@@ -783,10 +805,10 @@ export default function CASOrderFlow() {
                   </td>
                   <td
                     style={{
-                      padding: "6px 8px",
+                      padding: "9px 10px",
                       textAlign: "right",
                       fontFamily: MONO,
-                      fontSize: 11.5,
+                      fontSize: 13.5,
                       color: tone(s.pct),
                     }}
                   >
@@ -795,10 +817,10 @@ export default function CASOrderFlow() {
                   </td>
                   <td
                     style={{
-                      padding: "6px 8px",
+                      padding: "9px 10px",
                       textAlign: "right",
                       fontFamily: MONO,
-                      fontSize: 11.5,
+                      fontSize: 13.5,
                       color: tone(s.imbalance),
                     }}
                   >
@@ -807,11 +829,11 @@ export default function CASOrderFlow() {
                   </td>
                   <td
                     style={{
-                      padding: "6px 8px",
+                      padding: "9px 10px",
                       textAlign: "right",
                       fontFamily: MONO,
-                      fontSize: 11.5,
-                      fontWeight: 500,
+                      fontSize: 13.5,
+                      fontWeight: 600,
                       color: tone(s.points),
                     }}
                   >
@@ -827,10 +849,10 @@ export default function CASOrderFlow() {
 
       <div
         style={{
-          marginTop: 14,
-          paddingTop: 12,
+          marginTop: 16,
+          paddingTop: 14,
           borderTop: `1px solid ${C.rule}`,
-          fontSize: 11,
+          fontSize: 12.5,
           color: C.muted,
           lineHeight: 1.6,
         }}
