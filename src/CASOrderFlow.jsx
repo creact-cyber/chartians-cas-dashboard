@@ -9,33 +9,78 @@
  * is worse than one showing nothing, because the reader cannot tell.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import useLiveFeed from "./useLiveFeed.js";
 
 /* ---------------------------------------------------------------- tokens --- */
 
-// Light theme, built from the brand gradient: deep violet -> vivid violet -> magenta.
-// Green/red stay reserved for actual gains and losses so the numbers that matter
-// are never ambiguous with the brand color.
-const C = {
+// Brand gradient stays the same violet -> magenta hexes in both themes: it's
+// self-contained (always paired with white text or used as a whole gradient),
+// so it needs no re-stepping. What DOES change between themes is anything
+// that sits as flat text/surface directly on the page background — those get
+// their own steps per mode rather than an automatic invert.
+const BRAND_DEEP = "#5B21B6";
+const BRAND_MID = "#9D1DFF";
+const BRAND_BRIGHT = "#E619C4";
+const BRAND_GRADIENT = `linear-gradient(90deg, ${BRAND_DEEP}, ${BRAND_MID}, ${BRAND_BRIGHT})`;
+
+const LIGHT = {
   page: "#F8F5FC",
   hull: "#FFFFFF",
   slate: "#F1E9FB",
   rule: "#E2D6F5",
-  abyss: "#1E1333",
   champagne: "#5B21B6",
   champagneDim: "#8B7CAC",
-  verdigris: "#0CA30C",
-  oxide: "#D03B3B",
   muted: "#7C6D96",
   paper: "#241A3D",
-  brandDeep: "#5B21B6",
-  brandMid: "#9D1DFF",
-  brandBright: "#E619C4",
+  // Chip/badge backgrounds: self-contained with white text, same in both modes.
+  verdigris: "#0CA30C",
+  oxide: "#D03B3B",
+  // Flat text/stroke on the page or panel background: needs its own contrast
+  // per surface, so these diverge from the chip colors in dark mode.
+  positive: "#0CA30C",
+  negative: "#D03B3B",
+  neutralChip: "#8B7CAC",
+  brandDeep: BRAND_DEEP,
+  brandMid: BRAND_MID,
+  brandBright: BRAND_BRIGHT,
   onAccent: "#FFFFFF",
+  warnBg: "#FDECEC",
+  warnText: "#8A2424",
+  panelShadow: "0 1px 2px rgba(30, 19, 51, 0.04)",
 };
 
-const BRAND_GRADIENT = `linear-gradient(90deg, ${C.brandDeep}, ${C.brandMid}, ${C.brandBright})`;
+const DARK = {
+  page: "#120B1F",
+  hull: "#1B1230",
+  slate: "#2A1D45",
+  rule: "#3C2A5C",
+  champagne: "#C9A6FF",
+  champagneDim: "#A996C9",
+  muted: "#8F82AC",
+  paper: "#EDE7F9",
+  verdigris: "#0CA30C",
+  oxide: "#D03B3B",
+  positive: "#22D65A",
+  negative: "#FF6B6B",
+  neutralChip: "#8B7CAC",
+  brandDeep: BRAND_DEEP,
+  brandMid: BRAND_MID,
+  brandBright: BRAND_BRIGHT,
+  onAccent: "#FFFFFF",
+  warnBg: "#3A1414",
+  warnText: "#FFC2C2",
+  panelShadow: "none",
+};
+
+const ThemeContext = createContext(LIGHT);
 
 const DISPLAY = "'Archivo', ui-sans-serif, system-ui, sans-serif";
 const MONO = "'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace";
@@ -45,14 +90,28 @@ const FONTS =
 const T = (h, m) => h * 3600 + m * 60;
 
 const PHASES = [
-  { id: "REFERENCE", from: T(15, 15), to: T(15, 20), label: "Reference price", tone: C.muted },
-  { id: "ENTRY_ALL", from: T(15, 20), to: T(15, 25), label: "Market + limit", tone: C.champagne },
-  { id: "ENTRY_LIMIT_ONLY", from: T(15, 25), to: T(15, 30), label: "Limit only", tone: C.brandBright },
-  { id: "MATCHING", from: T(15, 30), to: T(15, 35), label: "Matching", tone: C.verdigris },
+  { id: "REFERENCE", from: T(15, 15), to: T(15, 20), label: "Reference price", toneKey: "neutralChip" },
+  { id: "ENTRY_ALL", from: T(15, 20), to: T(15, 25), label: "Market + limit", toneKey: "brandDeep" },
+  { id: "ENTRY_LIMIT_ONLY", from: T(15, 25), to: T(15, 30), label: "Limit only", toneKey: "brandBright" },
+  { id: "MATCHING", from: T(15, 30), to: T(15, 35), label: "Matching", toneKey: "verdigris" },
 ];
 
 const RAIL_FROM = T(15, 15);
 const RAIL_TO = T(15, 35);
+
+const THEME_STORAGE_KEY = "cas-theme";
+
+function getInitialDark() {
+  if (typeof window === "undefined") return false;
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "dark") return true;
+    if (stored === "light") return false;
+  } catch {
+    /* localStorage can be unavailable (private mode, etc); fall through */
+  }
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
 
 /* ---------------------------------------------------------------- format --- */
 
@@ -76,11 +135,12 @@ const mmss = (s) => {
   return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`;
 };
 
-const tone = (v) => (v > 0 ? C.verdigris : v < 0 ? C.oxide : C.muted);
+const tone = (t, v) => (v > 0 ? t.positive : v < 0 ? t.negative : t.muted);
 
 /* ------------------------------------------------------------ primitives --- */
 
-function Eyebrow({ children, color = C.champagneDim }) {
+function Eyebrow({ children, color }) {
+  const t = useContext(ThemeContext);
   return (
     <div
       style={{
@@ -89,7 +149,7 @@ function Eyebrow({ children, color = C.champagneDim }) {
         fontWeight: 600,
         letterSpacing: "0.16em",
         textTransform: "uppercase",
-        color,
+        color: color || t.champagneDim,
       }}
     >
       {children}
@@ -98,14 +158,15 @@ function Eyebrow({ children, color = C.champagneDim }) {
 }
 
 function Panel({ children, style }) {
+  const t = useContext(ThemeContext);
   return (
     <div
       className="cas-panel"
       style={{
-        background: C.hull,
-        border: `1px solid ${C.rule}`,
+        background: t.hull,
+        border: `1px solid ${t.rule}`,
         borderRadius: 10,
-        boxShadow: "0 1px 2px rgba(30, 19, 51, 0.04)",
+        boxShadow: t.panelShadow,
         ...style,
       }}
     >
@@ -114,9 +175,69 @@ function Panel({ children, style }) {
   );
 }
 
+function SunIcon({ size = 13 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round">
+      <circle cx="12" cy="12" r="4.3" />
+      <path d="M12 2.6v3M12 18.4v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.6 12h3M18.4 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </svg>
+  );
+}
+
+function MoonIcon({ size = 13 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#fff">
+      <path d="M20.8 14.5A9 9 0 1 1 9.5 3.2a7 7 0 0 0 11.3 11.3Z" />
+    </svg>
+  );
+}
+
+function ThemeToggle({ dark, onToggle }) {
+  const t = useContext(ThemeContext);
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-pressed={dark}
+      className="cas-theme-toggle"
+      style={{
+        width: 50,
+        height: 27,
+        borderRadius: 999,
+        border: `1px solid ${t.rule}`,
+        background: t.slate,
+        position: "relative",
+        cursor: "pointer",
+        padding: 0,
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 2,
+          left: dark ? 25 : 2,
+          width: 21,
+          height: 21,
+          borderRadius: "50%",
+          backgroundImage: BRAND_GRADIENT,
+          transition: "left 200ms ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {dark ? <MoonIcon /> : <SunIcon />}
+      </span>
+    </button>
+  );
+}
+
 /* ------------------------------------------------------------------ hero --- */
 
 function Hero({ frame }) {
+  const t = useContext(ThemeContext);
   const c = frame.closing;
   const secs = frame.secs || 0;
   const lockIn = T(15, 28) - secs;
@@ -131,13 +252,13 @@ function Hero({ frame }) {
             fontFamily: MONO,
             fontSize: "clamp(40px, 10vw, 60px)",
             fontWeight: 600,
-            color: C.champagne,
+            color: t.champagne,
             marginTop: 8,
           }}
         >
           {frame.nifty ? nf(frame.nifty) : "----"}
         </div>
-        <div style={{ color: C.muted, fontSize: 15, marginTop: 10 }}>
+        <div style={{ color: t.muted, fontSize: 15, marginTop: 10 }}>
           {!frame.marketHours
             ? "Market closed. The closing number appears during the auction, 3:15 to 3:35."
             : toStart > 0
@@ -154,7 +275,7 @@ function Hero({ frame }) {
     <Panel style={{ padding: "28px 26px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <Eyebrow>Nifty 50 will close at</Eyebrow>
-        <Eyebrow color={lockIn > 0 ? C.champagneDim : C.oxide}>
+        <Eyebrow color={lockIn > 0 ? t.champagneDim : t.negative}>
           {lockIn > 0 ? `book can lock in ${mmss(lockIn)}` : "book may lock at any moment"}
         </Eyebrow>
       </div>
@@ -184,15 +305,15 @@ function Hero({ frame }) {
           marginTop: 10,
         }}
       >
-        <div style={{ fontFamily: MONO, fontSize: 23, fontWeight: 600, color: tone(c.changePoints) }}>
+        <div style={{ fontFamily: MONO, fontSize: 23, fontWeight: 600, color: tone(t, c.changePoints) }}>
           {up ? "+" : ""}
           {nf(c.changePoints)} ({up ? "+" : ""}
           {c.changePct}%)
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 17, color: C.paper }}>
+        <div style={{ fontFamily: MONO, fontSize: 17, color: t.paper }}>
           &plusmn; {c.bandPoints} pts
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 15, color: C.muted }}>
+        <div style={{ fontFamily: MONO, fontSize: 15, color: t.muted }}>
           {nf(c.low)} to {nf(c.high)}
         </div>
       </div>
@@ -206,7 +327,7 @@ function Hero({ frame }) {
             left: 0,
             right: 0,
             height: 3,
-            background: C.slate,
+            background: t.slate,
           }}
         />
         <div
@@ -216,7 +337,7 @@ function Hero({ frame }) {
             left: "26%",
             width: "48%",
             height: 3,
-            background: tone(c.changePoints),
+            background: tone(t, c.changePoints),
             opacity: 0.45,
           }}
         />
@@ -227,7 +348,7 @@ function Hero({ frame }) {
             left: "50%",
             width: 2,
             height: 15,
-            background: C.champagne,
+            background: t.champagne,
             transform: "translateX(-1px)",
           }}
         />
@@ -241,7 +362,7 @@ function Hero({ frame }) {
             justifyContent: "space-between",
             fontFamily: MONO,
             fontSize: 11.5,
-            color: C.muted,
+            color: t.muted,
           }}
         >
           <span>{nf(c.low, 0)}</span>
@@ -249,7 +370,7 @@ function Hero({ frame }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.55 }}>
+      <div style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.55 }}>
         Anchored to the 3:15 print of {nf(c.anchor)}. Band {c.bandBasis}. Covering{" "}
         {c.coverage}% of index weight. The figure is exact if the order book stops
         changing, and orders can still arrive until the book locks.
@@ -261,6 +382,7 @@ function Hero({ frame }) {
 /* ------------------------------------------------------------------ rail --- */
 
 function Rail({ frame }) {
+  const t = useContext(ThemeContext);
   const trail = frame.trail || [];
   const secs = frame.secs || 0;
   const W = 1000;
@@ -270,7 +392,7 @@ function Rail({ frame }) {
   const plotTop = 66;
   const plotH = 70;
 
-  const x = (t) => 8 + ((t - RAIL_FROM) / (RAIL_TO - RAIL_FROM)) * (W - 16);
+  const x = (time) => 8 + ((time - RAIL_FROM) / (RAIL_TO - RAIL_FROM)) * (W - 16);
 
   const ext = useMemo(() => {
     const anchor = frame.closing?.anchor;
@@ -293,7 +415,7 @@ function Rail({ frame }) {
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
       <defs>
         <pattern id="hx" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-          <line x1="0" y1="0" x2="0" y2="6" stroke={C.oxide} strokeWidth="1.4" opacity="0.5" />
+          <line x1="0" y1="0" x2="0" y2="6" stroke={t.negative} strokeWidth="1.4" opacity="0.5" />
         </pattern>
       </defs>
 
@@ -306,7 +428,7 @@ function Rail({ frame }) {
               y={railY}
               width={x(p.to) - x(p.from) - 2}
               height={railH}
-              fill={on ? p.tone : C.slate}
+              fill={on ? t[p.toneKey] : t.slate}
               rx="1.5"
             />
             <text
@@ -316,7 +438,7 @@ function Rail({ frame }) {
               fontSize="11"
               fontWeight="600"
               letterSpacing="0.07em"
-              fill={on ? C.onAccent : C.muted}
+              fill={on ? t.onAccent : t.muted}
             >
               {p.label.toUpperCase()}
             </text>
@@ -338,7 +460,7 @@ function Rail({ frame }) {
         fontSize="10"
         fontWeight="600"
         letterSpacing="0.1em"
-        fill={C.oxide}
+        fill={t.negative}
       >
         RANDOM CLOSE
       </text>
@@ -350,7 +472,7 @@ function Rail({ frame }) {
             y1={y(ext.anchor)}
             x2={W - 8}
             y2={y(ext.anchor)}
-            stroke={C.rule}
+            stroke={t.rule}
             strokeDasharray="3 4"
           />
           <text
@@ -359,19 +481,19 @@ function Rail({ frame }) {
             textAnchor="end"
             fontFamily={MONO}
             fontSize="10.5"
-            fill={C.champagneDim}
+            fill={t.champagneDim}
           >
             3:15 print {nf(ext.anchor)}
           </text>
-          <path d={path} fill="none" stroke={dir >= 0 ? C.verdigris : C.oxide} strokeWidth="1.9" />
+          <path d={path} fill="none" stroke={dir >= 0 ? t.positive : t.negative} strokeWidth="1.9" />
           {last && (
-            <circle cx={x(last.t)} cy={y(last.v)} r="3.4" fill={dir >= 0 ? C.verdigris : C.oxide} />
+            <circle cx={x(last.t)} cy={y(last.v)} r="3.4" fill={dir >= 0 ? t.positive : t.negative} />
           )}
         </>
       )}
 
       {secs >= RAIL_FROM && secs <= RAIL_TO && (
-        <line x1={x(secs)} y1={railY - 5} x2={x(secs)} y2={plotTop + plotH + 5} stroke={C.champagne} />
+        <line x1={x(secs)} y1={railY - 5} x2={x(secs)} y2={plotTop + plotH + 5} stroke={t.champagne} />
       )}
     </svg>
   );
@@ -380,6 +502,7 @@ function Rail({ frame }) {
 /* ------------------------------------------------------------ status bar --- */
 
 function StatusBar({ frame, live, status }) {
+  const t = useContext(ThemeContext);
   const chip = (label, color, bg, key) => (
     <span
       key={key}
@@ -406,23 +529,23 @@ function StatusBar({ frame, live, status }) {
   const chips = [];
 
   if (!live) {
-    chips.push(chip(status === "stale" ? "FEED STALLED" : "FEED OFFLINE", C.onAccent, C.oxide, "l"));
+    chips.push(chip(status === "stale" ? "FEED STALLED" : "FEED OFFLINE", t.onAccent, t.oxide, "l"));
   } else if (frame?.marketHours && !dataFresh) {
-    chips.push(chip("EXCHANGE DATA STALE", C.onAccent, C.oxide, "l"));
+    chips.push(chip("EXCHANGE DATA STALE", t.onAccent, t.oxide, "l"));
   } else if (!frame?.marketHours) {
-    chips.push(chip("MARKET CLOSED", C.champagne, C.slate, "l"));
+    chips.push(chip("MARKET CLOSED", t.champagne, t.slate, "l"));
   } else {
-    chips.push(chip("LIVE", C.onAccent, C.verdigris, "l"));
+    chips.push(chip("LIVE", t.onAccent, t.verdigris, "l"));
   }
   if (frame?.segmentStatus && frame.segmentStatus !== "UNKNOWN") {
-    chips.push(chip(frame.segmentStatus.replace("_", " "), C.champagne, C.slate, "s"));
+    chips.push(chip(frame.segmentStatus.replace("_", " "), t.champagne, t.slate, "s"));
   }
   if (frame?.iep) {
     chips.push(
       chip(
         `IEP ${frame.iep.confirmed ? "CONFIRMED" : "UNCONFIRMED"} ${frame.iep.movingWithFrozenVolume}/${frame.iep.sampled}`,
-        C.onAccent,
-        frame.iep.confirmed ? C.verdigris : C.oxide,
+        t.onAccent,
+        frame.iep.confirmed ? t.verdigris : t.oxide,
         "i"
       )
     );
@@ -433,9 +556,10 @@ function StatusBar({ frame, live, status }) {
 
 /* ============================================================== dashboard === */
 
-export default function CASOrderFlow() {
+function Dashboard({ dark, onToggle }) {
   const { frame, live, status } = useLiveFeed();
   const [sortKey, setSortKey] = useState("points");
+  const t = useContext(ThemeContext);
 
   useEffect(() => {
     const el = document.createElement("link");
@@ -463,8 +587,8 @@ export default function CASOrderFlow() {
   }, [stocks]);
 
   const wrap = {
-    background: C.page,
-    color: C.paper,
+    background: t.page,
+    color: t.paper,
     fontFamily: DISPLAY,
     minHeight: "100vh",
     padding: "clamp(14px, 3vw, 28px) clamp(14px, 4vw, 32px) 36px",
@@ -473,8 +597,19 @@ export default function CASOrderFlow() {
   if (!frame) {
     return (
       <div style={wrap}>
-        <Eyebrow>The Chartians</Eyebrow>
-        <div style={{ marginTop: 20, color: C.muted, fontSize: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <Eyebrow>The Chartians</Eyebrow>
+          <ThemeToggle dark={dark} onToggle={onToggle} />
+        </div>
+        <div style={{ marginTop: 20, color: t.muted, fontSize: 16 }}>
           {live ? "Waiting for the first frame." : "Connecting to the live feed."}
         </div>
       </div>
@@ -498,7 +633,7 @@ export default function CASOrderFlow() {
           alignItems: "flex-end",
           flexWrap: "wrap",
           gap: 14,
-          borderBottom: `1px solid ${C.rule}`,
+          borderBottom: `1px solid ${t.rule}`,
           paddingBottom: 14,
           marginBottom: 16,
         }}
@@ -510,7 +645,7 @@ export default function CASOrderFlow() {
               fontSize: "clamp(22px, 4vw, 30px)",
               fontWeight: 700,
               letterSpacing: "-0.02em",
-              color: C.champagne,
+              color: t.champagne,
               marginTop: 4,
             }}
           >
@@ -525,26 +660,27 @@ export default function CASOrderFlow() {
               style={{
                 fontFamily: MONO,
                 fontSize: "clamp(20px, 3.5vw, 27px)",
-                color: C.champagne,
+                color: t.champagne,
                 fontVariantNumeric: "tabular-nums",
               }}
             >
               {frame.clock}
             </div>
           </div>
+          <ThemeToggle dark={dark} onToggle={onToggle} />
         </div>
       </div>
 
       {live && frame.marketHours && !(frame.feedAgeSec < 10) && (
         <div
           style={{
-            background: "#FDECEC",
-            border: `1px solid ${C.oxide}`,
+            background: t.warnBg,
+            border: `1px solid ${t.negative}`,
             padding: "12px 16px",
             marginBottom: 16,
             borderRadius: 8,
             fontSize: 14,
-            color: "#8A2424",
+            color: t.warnText,
           }}
         >
           The exchange feed has gone quiet
@@ -556,13 +692,13 @@ export default function CASOrderFlow() {
       {!live && (
         <div
           style={{
-            background: "#FDECEC",
-            border: `1px solid ${C.oxide}`,
+            background: t.warnBg,
+            border: `1px solid ${t.negative}`,
             padding: "12px 16px",
             marginBottom: 16,
             borderRadius: 8,
             fontSize: 14,
-            color: "#8A2424",
+            color: t.warnText,
           }}
         >
           The feed has stopped. These numbers are the last received and are no longer
@@ -591,7 +727,7 @@ export default function CASOrderFlow() {
             {frame.futures ? (
               <>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 6 }}>
-                  <div style={{ fontFamily: MONO, fontSize: 25, color: C.paper }}>
+                  <div style={{ fontFamily: MONO, fontSize: 25, color: t.paper }}>
                     {nf(frame.futures.futures)}
                   </div>
                   <div
@@ -599,7 +735,7 @@ export default function CASOrderFlow() {
                       fontFamily: MONO,
                       fontSize: 15,
                       fontWeight: 600,
-                      color: tone(frame.futures.gapPoints),
+                      color: tone(t, frame.futures.gapPoints),
                     }}
                   >
                     {frame.futures.gapPoints >= 0 ? "+" : ""}
@@ -609,7 +745,7 @@ export default function CASOrderFlow() {
                 <div
                   style={{
                     fontSize: 13,
-                    color: frame.futures.significant ? C.champagne : C.muted,
+                    color: frame.futures.significant ? t.champagne : t.muted,
                     marginTop: 6,
                     lineHeight: 1.5,
                   }}
@@ -619,18 +755,18 @@ export default function CASOrderFlow() {
                 </div>
               </>
             ) : (
-              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 6 }}>
+              <div style={{ color: t.muted, fontSize: 13.5, marginTop: 6 }}>
                 Available once the auction anchors.
               </div>
             )}
           </div>
 
-          <div style={{ height: 1, background: C.rule }} />
+          <div style={{ height: 1, background: t.rule }} />
 
           <div>
             <Eyebrow>Cash order tilt</Eyebrow>
             {!frame.anchored ? (
-              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+              <div style={{ color: t.muted, fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
                 Meaningful only during the auction. Outside it, the book carries
                 leftovers from the previous session.
               </div>
@@ -640,13 +776,13 @@ export default function CASOrderFlow() {
               <div
                 style={{
                   width: `${totals.tilt}%`,
-                  backgroundImage: `linear-gradient(90deg, ${C.brandDeep}, ${C.brandMid})`,
+                  backgroundImage: `linear-gradient(90deg, ${t.brandDeep}, ${t.brandMid})`,
                   display: "flex",
                   alignItems: "center",
                   paddingLeft: 9,
                   fontFamily: MONO,
                   fontSize: 12.5,
-                  color: C.onAccent,
+                  color: t.onAccent,
                   fontWeight: 600,
                   transition: "width 400ms ease",
                 }}
@@ -656,14 +792,14 @@ export default function CASOrderFlow() {
               <div
                 style={{
                   width: `${100 - totals.tilt}%`,
-                  background: C.brandBright,
+                  background: t.brandBright,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "flex-end",
                   paddingRight: 9,
                   fontFamily: MONO,
                   fontSize: 12.5,
-                  color: C.onAccent,
+                  color: t.onAccent,
                   fontWeight: 600,
                   transition: "width 400ms ease",
                 }}
@@ -677,7 +813,7 @@ export default function CASOrderFlow() {
                 justifyContent: "space-between",
                 fontFamily: MONO,
                 fontSize: 12,
-                color: C.muted,
+                color: t.muted,
                 marginTop: 6,
               }}
             >
@@ -723,8 +859,8 @@ export default function CASOrderFlow() {
                   borderRadius: 6,
                   cursor: "pointer",
                   background: sortKey === k ? BRAND_GRADIENT : "transparent",
-                  color: sortKey === k ? C.onAccent : C.muted,
-                  border: `1px solid ${sortKey === k ? "transparent" : C.rule}`,
+                  color: sortKey === k ? t.onAccent : t.muted,
+                  border: `1px solid ${sortKey === k ? "transparent" : t.rule}`,
                 }}
               >
                 {l}
@@ -753,9 +889,9 @@ export default function CASOrderFlow() {
                       fontWeight: 600,
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      color: C.champagneDim,
+                      color: t.champagneDim,
                       padding: "0 10px 9px",
-                      borderBottom: `1px solid ${C.rule}`,
+                      borderBottom: `1px solid ${t.rule}`,
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -766,7 +902,7 @@ export default function CASOrderFlow() {
             </thead>
             <tbody>
               {sorted.map((s) => (
-                <tr key={s.sym} className="cas-row" style={{ borderBottom: `1px solid ${C.rule}` }}>
+                <tr key={s.sym} className="cas-row" style={{ borderBottom: `1px solid ${t.rule}` }}>
                   <td
                     style={{
                       padding: "9px 10px",
@@ -776,7 +912,7 @@ export default function CASOrderFlow() {
                     }}
                   >
                     {s.sym}
-                    <span style={{ color: C.muted, fontSize: 11, marginLeft: 6 }}>
+                    <span style={{ color: t.muted, fontSize: 11, marginLeft: 6 }}>
                       {s.weight}%
                     </span>
                   </td>
@@ -786,7 +922,7 @@ export default function CASOrderFlow() {
                       textAlign: "right",
                       fontFamily: MONO,
                       fontSize: 13.5,
-                      color: C.muted,
+                      color: t.muted,
                     }}
                   >
                     {nf(s.ref)}
@@ -798,7 +934,7 @@ export default function CASOrderFlow() {
                       fontFamily: MONO,
                       fontSize: 13.5,
                       fontWeight: 600,
-                      color: C.champagne,
+                      color: t.champagne,
                     }}
                   >
                     {nf(s.iep)}
@@ -809,7 +945,7 @@ export default function CASOrderFlow() {
                       textAlign: "right",
                       fontFamily: MONO,
                       fontSize: 13.5,
-                      color: tone(s.pct),
+                      color: tone(t, s.pct),
                     }}
                   >
                     {s.pct >= 0 ? "+" : ""}
@@ -821,7 +957,7 @@ export default function CASOrderFlow() {
                       textAlign: "right",
                       fontFamily: MONO,
                       fontSize: 13.5,
-                      color: tone(s.imbalance),
+                      color: tone(t, s.imbalance),
                     }}
                   >
                     {s.imbalance >= 0 ? "+" : ""}
@@ -834,7 +970,7 @@ export default function CASOrderFlow() {
                       fontFamily: MONO,
                       fontSize: 13.5,
                       fontWeight: 600,
-                      color: tone(s.points),
+                      color: tone(t, s.points),
                     }}
                   >
                     {s.points >= 0 ? "+" : ""}
@@ -851,9 +987,9 @@ export default function CASOrderFlow() {
         style={{
           marginTop: 16,
           paddingTop: 14,
-          borderTop: `1px solid ${C.rule}`,
+          borderTop: `1px solid ${t.rule}`,
           fontSize: 12.5,
-          color: C.muted,
+          color: t.muted,
           lineHeight: 1.6,
         }}
       >
@@ -865,5 +1001,24 @@ export default function CASOrderFlow() {
         Enlistment 6874
       </div>
     </div>
+  );
+}
+
+export default function CASOrderFlow() {
+  const [dark, setDark] = useState(getInitialDark);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, dark ? "dark" : "light");
+    } catch {
+      /* localStorage can be unavailable; the toggle still works for this visit */
+    }
+  }, [dark]);
+
+  return (
+    <ThemeContext.Provider value={dark ? DARK : LIGHT}>
+      <Dashboard dark={dark} onToggle={() => setDark((d) => !d)} />
+    </ThemeContext.Provider>
   );
 }

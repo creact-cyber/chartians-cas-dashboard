@@ -7,6 +7,22 @@ body,
   background: #f8f5fc;
 }
 
+/* Default to the OS preference until the toggle sets an explicit choice
+   (html[data-theme]) — the light/dark values here mirror the CASOrderFlow.jsx
+   LIGHT/DARK "page" token so the outer shell never flashes a mismatched color. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]),
+  html:not([data-theme="light"]) body,
+  html:not([data-theme="light"]) #root {
+    background: #120b1f;
+  }
+}
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  background: #120b1f;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -29,10 +45,14 @@ a:focus-visible {
 
 /* Panels lift gently on hover for a tactile, elegant feel. */
 .cas-panel {
-  transition: box-shadow 200ms ease, transform 200ms ease;
+  transition: box-shadow 200ms ease, transform 200ms ease, background 200ms ease,
+    border-color 200ms ease;
 }
 .cas-panel:hover {
   box-shadow: 0 6px 20px rgba(91, 33, 182, 0.1);
+}
+html[data-theme="dark"] .cas-panel:hover {
+  box-shadow: 0 6px 20px rgba(157, 92, 255, 0.18);
 }
 
 /* Rail + futures/tilt panel: stacks to one column on narrow viewports. */
@@ -62,6 +82,9 @@ a:focus-visible {
 .cas-row:hover {
   background: rgba(157, 29, 255, 0.05);
 }
+html[data-theme="dark"] .cas-row:hover {
+  background: rgba(157, 29, 255, 0.14);
+}
 
 .cas-table-scroll {
   scrollbar-width: thin;
@@ -74,6 +97,12 @@ a:focus-visible {
   background: #cbb8ea;
   border-radius: 8px;
 }
+html[data-theme="dark"] .cas-table-scroll {
+  scrollbar-color: #4a3570 #120b1f;
+}
+html[data-theme="dark"] .cas-table-scroll::-webkit-scrollbar-thumb {
+  background: #4a3570;
+}
 
 /* The hero close figure: the brand gradient painted through the numerals. */
 .cas-hero-figure {
@@ -82,4 +111,11 @@ a:focus-visible {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+}
+
+.cas-theme-toggle {
+  transition: border-color 160ms ease;
+}
+.cas-theme-toggle:hover {
+  border-color: #9d1dff;
 }
