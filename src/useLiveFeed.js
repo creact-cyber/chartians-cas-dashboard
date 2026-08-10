@@ -28,6 +28,10 @@ export default function useLiveFeed() {
   const [frame, setFrame] = useState(null);
   const [status, setStatus] = useState("connecting");
   const [lastUpdate, setLastUpdate] = useState(0);
+  // Forces a re-render on a clock, independent of whether new frames arrive,
+  // so staleness gets re-checked even if the socket dies silently (no close
+  // event) instead of freezing the page on a falsely-green "LIVE" badge.
+  const [, forceTick] = useState(0);
 
   const wsRef = useRef(null);
   const retryRef = useRef(0);
@@ -102,9 +106,12 @@ export default function useLiveFeed() {
     };
     document.addEventListener("visibilitychange", onVisible);
 
+    const staleCheck = setInterval(() => forceTick((x) => x + 1), 1000);
+
     return () => {
       closedRef.current = true;
       clearTimeout(timerRef.current);
+      clearInterval(staleCheck);
       document.removeEventListener("visibilitychange", onVisible);
       try {
         wsRef.current?.close();

@@ -318,6 +318,26 @@ function Hero({ frame }) {
         </div>
       </div>
 
+      {!!frame.nifty && (
+        <div style={{ fontFamily: MONO, fontSize: 13.5, color: t.muted, marginTop: 8 }}>
+          Live spot {nf(frame.nifty)}
+          {(() => {
+            const spotGap = frame.nifty - c.indicative;
+            const significant = Math.abs(spotGap) > c.bandPoints;
+            return (
+              <>
+                {" "}
+                <span style={{ color: tone(t, spotGap), fontWeight: 600 }}>
+                  {spotGap >= 0 ? "+" : ""}
+                  {nf(spotGap)}
+                </span>{" "}
+                vs the indicative close{significant ? ", exceeds the band" : ""}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* band as a physical range, so the uncertainty is felt not read */}
       <div style={{ marginTop: 16, position: "relative", height: 30 }}>
         <div
