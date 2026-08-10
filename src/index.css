@@ -4,14 +4,82 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: #080f1c;
+  background: #f8f5fc;
 }
 
 * {
   box-sizing: border-box;
 }
 
-button:focus-visible {
-  outline: 2px solid #e4d9b4;
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #9d1dff;
   outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Panels lift gently on hover for a tactile, elegant feel. */
+.cas-panel {
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.cas-panel:hover {
+  box-shadow: 0 6px 20px rgba(91, 33, 182, 0.1);
+}
+
+/* Rail + futures/tilt panel: stacks to one column on narrow viewports. */
+.cas-two-col {
+  display: grid;
+  grid-template-columns: minmax(300px, 2.2fr) minmax(230px, 1fr);
+  gap: 14px;
+}
+@media (max-width: 760px) {
+  .cas-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cas-sort-btn {
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease,
+    transform 120ms ease;
+}
+.cas-sort-btn:hover {
+  transform: translateY(-1px);
+  border-color: #9d1dff;
+}
+
+.cas-row {
+  transition: background 150ms ease;
+}
+.cas-row:hover {
+  background: rgba(157, 29, 255, 0.05);
+}
+
+.cas-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbb8ea #f8f5fc;
+}
+.cas-table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.cas-table-scroll::-webkit-scrollbar-thumb {
+  background: #cbb8ea;
+  border-radius: 8px;
+}
+
+/* The hero close figure: the brand gradient painted through the numerals. */
+.cas-hero-figure {
+  display: inline-block;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
