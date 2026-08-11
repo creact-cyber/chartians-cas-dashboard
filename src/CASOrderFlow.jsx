@@ -519,6 +519,59 @@ function Rail({ frame }) {
   );
 }
 
+/* --------------------------------------------------------------- candle --- */
+
+// One OHLC candle for the whole session: open at the 3:15 print, high/low
+// from the actual indicative path recorded so far, close at the live
+// indicative. Same shape a 20-minute candle would take on any chart — this
+// is just the CAS session viewed as a single bar instead of a line.
+function CasCandle({ frame }) {
+  const t = useContext(ThemeContext);
+  const c = frame.closing;
+  if (!c) return null;
+
+  const trail = frame.trail || [];
+  const vals = trail.map((p) => p.v).concat([c.anchor, c.indicative]);
+  const open = c.anchor;
+  const close = c.indicative;
+  const hi = Math.max(...vals);
+  const lo = Math.min(...vals);
+  const up = close >= open;
+  const color = up ? t.positive : t.negative;
+
+  const range = Math.max(hi - lo, 0.01);
+  const H = 34;
+  const pad = 3;
+  const y = (v) => pad + (1 - (v - lo) / range) * (H - pad * 2);
+  const bodyTop = y(Math.max(open, close));
+  const bodyBottom = y(Math.min(open, close));
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <svg width="16" height={H} viewBox={`0 0 16 ${H}`} style={{ flexShrink: 0 }}>
+        <line x1="8" y1={y(hi)} x2="8" y2={y(lo)} stroke={color} strokeWidth="1.5" />
+        <rect
+          x="3"
+          y={bodyTop}
+          width="10"
+          height={Math.max(bodyBottom - bodyTop, 1.5)}
+          fill={color}
+          rx="1.5"
+        />
+      </svg>
+      <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.muted, lineHeight: 1.6 }}>
+        <div>
+          O {nf(open)} &nbsp; H {nf(hi)}
+        </div>
+        <div>
+          L {nf(lo)} &nbsp; C{" "}
+          <span style={{ color, fontWeight: 700 }}>{nf(close)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------ status bar --- */
 
 function StatusBar({ frame, live, status }) {
@@ -737,7 +790,18 @@ function Dashboard({ dark, onToggle }) {
         }}
       >
         <Panel style={{ padding: "12px 12px 4px" }}>
-          <Eyebrow>Auction path</Eyebrow>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            <Eyebrow>Auction path</Eyebrow>
+            <CasCandle frame={frame} />
+          </div>
           <Rail frame={frame} />
         </Panel>
 
